@@ -1,1 +1,117 @@
+import torch
+import torchvision
+from torch import nn
+from torch.autograd import Variable
+from torch.utils.data import DataLoader
+from torchvision import transforms
+from torchvision.utils import save_image
+from torchvision.datasets import MNIST
+import torch.nn.functional as F
+import os
+import matplotlib.pyplot as plt
 
+import torch.nn as nn
+# from torch_geometric.nn import GCNConv
+
+class kiunet(nn.Module):
+    
+    def __init__(self):
+        super(kiunet, self).__init__()
+
+        self.encoder1 =  nn.Conv2d(1, 16, 3, stride=1, padding=1)  # First Layer GrayScale Image , change to input channels to 3 in case of RGB
+        self.en1_in = nn.InstanceNorm2d(16)
+        self.encoder2 =  nn.Conv2d(16, 32, 3, stride=1, padding=1)  
+        self.en2_in = nn.InstanceNorm2d(32)
+        self.encoder3 =  nn.Conv2d(32, 48, 3, stride=1, padding=1)
+        self.en3_in = nn.InstanceNorm2d(48)
+        self.encoder4 =  nn.Conv2d(48, 64, 3, stride=1, padding=1)
+        self.en4_in = nn.InstanceNorm2d(64)
+
+        self.decoder1 =  nn.Conv2d(64, 48, 3, stride=1, padding=1)   
+        self.de1_in = nn.InstanceNorm2d(48)
+        self.decoder2 =  nn.Conv2d(48, 32, 3, stride=1, padding=1)
+        self.de2_in = nn.InstanceNorm2d(32)
+        self.decoder3 =  nn.Conv2d(32, 16, 3, stride=1, padding=1)
+        self.de3_in = nn.InstanceNorm2d(16)
+        self.decoder4 =  nn.Conv2d(16, 8, 3, stride=1, padding=1)
+        self.de4_in = nn.InstanceNorm2d(8)
+
+        self.decoder_f1 = nn.Conv2d(64, 48, 3, stride=1, padding=1)   
+        self.def1_in = nn.InstanceNorm2d(48)
+        self.decoder_f2 = nn.Conv2d(48, 32, 3, stride=1, padding=1)
+        self.def2_in = nn.InstanceNorm2d(32)
+        self.decoder_f3 = nn.Conv2d(32, 16, 3, stride=1, padding=1)
+        self.def3_in = nn.InstanceNorm2d(16)
+        self.decoder_f4 = nn.Conv2d(16, 8, 3, stride=1, padding=1)
+        self.def4_in = nn.InstanceNorm2d(8)
+
+        self.encoder_f1 = nn.Conv2d(1, 16, 3, stride=1, padding=1)  # First Layer GrayScale Image , change to input channels to 3 in case of RGB
+        self.enf1_in = nn.InstanceNorm2d(16)
+        self.encoder_f2 = nn.Conv2d(16, 32, 3, stride=1, padding=1)  
+        self.enf2_in = nn.InstanceNorm2d(32)
+        self.encoder_f3 = nn.Conv2d(32, 48, 3, stride=1, padding=1)
+        self.enf3_in = nn.InstanceNorm2d(48)
+        self.encoder_f4 = nn.Conv2d(48, 64, 3, stride=1, padding=1)
+        self.enf4_in = nn.InstanceNorm2d(64)
+
+
+        self.final = nn.Conv2d(8,2,1,stride=1,padding=0)
+        
+        self.soft = nn.Softmax(dim =1)
+    
+    def forward(self, x):
+
+        out = F.leaky_relu(self.en1_in(F.max_pool2d(self.encoder1(x), 2, 2)))  #U-Net branch
+        out1 = F.leaky_relu(self.enf1_in(F.interpolate(self.encoder_f1(x), scale_factor=(2, 2), mode='bilinear'))) #Ki-Net branch
+        
+        u1 = out  #skip conn
+        o1 = out1  #skip conn
+
+        out = F.leaky_relu(self.en2_in(F.max_pool2d(self.encoder2(out),2,2)))
+        out1 = F.leaky_relu(self.enf2_in(F.interpolate(self.encoder_f2(out1),scale_factor=(2,2),mode ='bilinear')))
+  
+        u2 = out
+        o2 = out1
+
+        out = F.leaky_relu(self.en3_in(F.max_pool2d(self.encoder3(out),2,2)))
+        out1 = F.leaky_relu(self.enf3_in(F.interpolate(self.encoder_f3(out1),scale_factor=(2,2),mode ='bilinear')))
+        
+        u3 = out
+        o3 = out1
+
+        out = F.leaky_relu(self.en4_in(F.max_pool2d(self.encoder4(out),2,2)))
+        out1 = F.leaky_relu(self.enf4_in(F.interpolate(self.encoder_f4(out1),scale_factor=(2,2),mode ='bilinear')))
+        
+        ### End of encoder block
+
+        ### Start Decoder
+        
+        out = F.leaky_relu(self.de1_in(F.interpolate(self.decoder1(out),scale_factor=(2,2),mode ='bilinear')))  #U-NET
+        out1 = F.leaky_relu(self.def1_in(F.max_pool2d(self.decoder_f1(out1),2,2))) #Ki-NET
+        
+        out = torch.add(out,u3)  #skip conn
+        out1 = torch.add(out1,o3)  #skip conn
+
+        out = F.leaky_relu(self.de2_in(F.interpolate(self.decoder2(out),scale_factor=(2,2),mode ='bilinear')))
+        out1 = F.leaky_relu(self.def2_in(F.max_pool2d(self.decoder_f2(out1),2,2)))
+       
+        out = torch.add(out,u2)
+        out1 = torch.add(out1,o2)
+
+        out = F.leaky_relu(self.de3_in(F.interpolate(self.decoder3(out),scale_factor=(2,2),mode ='bilinear')))
+        out1 = F.leaky_relu(self.def3_in(F.max_pool2d(self.decoder_f3(out1),2,2)))
+       
+        out = torch.add(out,u1)
+        out1 = torch.add(out1,o1)
+
+        out = F.leaky_relu(self.de4_in(F.interpolate(self.decoder4(out),scale_factor=(2,2),mode ='bilinear')))
+        out1 = F.leaky_relu(self.def4_in(F.max_pool2d(self.decoder_f4(out1),2,2)))
+
+        out = torch.add(out,out1) # fusion of both branches
+
+        out = F.leaky_relu(self.final(out))  #1*1 conv
+        
+
+        out = self.soft(out)
+        
+        return out
