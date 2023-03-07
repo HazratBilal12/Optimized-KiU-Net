@@ -1,5 +1,5 @@
-# Code for KiU-Net
-# Author: Jeya Maria Jose
+# Code for Optimized-KiU-Net
+# Author: Hazrat Bilal
 import argparse
 import torch
 import torchvision
@@ -26,7 +26,7 @@ from functools import partial
 from random import randint
 import timeit
 
-from arch.ae import kiunet,kinetwithsk,unet,autoencoder, reskiunet,densekiunet, kiunet3d
+from model import kiunet
 
 def mae(imageA, imageB):
     # the 'Mean Squared Error' between the two images is the
