@@ -1,4 +1,5 @@
-# Optimized-KiU-Net
+# Optimized-KiU-Net  
+Further details will be provided after the paper is published.
 # About this repo:
 # Introduction
 ### Prerequisites:
